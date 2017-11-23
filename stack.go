@@ -1,6 +1,9 @@
 package shortlivedpool
 
-import "time"
+import (
+	"sync"
+	"time"
+)
 
 const (
 	defaultMinSize = 64
@@ -13,33 +16,27 @@ type item struct {
 }
 
 type Stack struct {
+	sync.Mutex
 	oldest time.Time
 	vec    []item
 }
 
-var ()
-
-func (s Stack) Peek() interface{} {
-	return s.vec[len(s.vec)-1].x
-}
-
-func (s Stack) Len() int {
-	return len(s.vec)
-}
-
 func (s *Stack) Put(x interface{}) {
 	now := time.Now()
+	s.Lock()
 	s.vec = append(s.vec, item{
 		x:  x,
 		ts: now,
 	})
 	if len(s.vec) == 1 {
 		s.oldest = now
+		s.Unlock()
 		return
 	}
 	if s.oldest.Add(maxTimeInStack).Before(now) {
 		s.shrink()
 	}
+	s.Unlock()
 }
 
 func (s *Stack) Pop() interface{} {
@@ -47,8 +44,10 @@ func (s *Stack) Pop() interface{} {
 	if l == 0 {
 		return nil
 	}
+	s.Lock()
 	x := s.vec[l-1].x
 	s.vec = s.vec[:l-1]
+	s.Unlock()
 	return x
 }
 
