@@ -17,13 +17,13 @@ type item struct {
 
 type Stack struct {
 	sync.Mutex
-	vec []*item
+	vec []item
 }
 
 func (s *Stack) Put(x interface{}) {
 	now := time.Now()
 	s.Lock()
-	s.vec = append(s.vec, &item{
+	s.vec = append(s.vec, item{
 		x:  x,
 		ts: now,
 	})
@@ -33,7 +33,7 @@ func (s *Stack) Put(x interface{}) {
 	}
 	if s.vec[0].ts.Add(maxTimeInStack).Before(now) {
 		// Take out the oldest element
-		s.vec[0] = nil
+		s.vec[0].x = nil
 		s.vec = s.vec[1:]
 		if len(s.vec) > defaultMinSize {
 			s.shrink()
@@ -50,7 +50,7 @@ func (s *Stack) Pop() interface{} {
 		return nil
 	}
 	x := s.vec[l-1].x
-	s.vec[l-1] = nil
+	s.vec[l-1].x = nil
 	s.vec = s.vec[:l-1]
 	s.Unlock()
 	return x
@@ -58,7 +58,7 @@ func (s *Stack) Pop() interface{} {
 
 func (s *Stack) shrink() {
 	if cap(s.vec) > len(s.vec)*4 {
-		newVec := make([]*item, len(s.vec), len(s.vec)*2)
+		newVec := make([]item, len(s.vec), len(s.vec)*2)
 		copy(newVec, s.vec)
 		s.vec = newVec
 	}
