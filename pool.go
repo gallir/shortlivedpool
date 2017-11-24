@@ -23,7 +23,10 @@ func (p *Pool) Put(x interface{}) {
 // the result of calling p.New.
 func (p *Pool) Get() (x interface{}) {
 	x = p.stack.Pop()
-	if x == nil && p.New != nil {
+	if x != nil {
+		return
+	}
+	if p.New != nil {
 		return p.New()
 	}
 	return
