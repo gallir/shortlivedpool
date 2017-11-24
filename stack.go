@@ -6,22 +6,24 @@ import (
 )
 
 const (
-	defaultMinSize = 64
-	maxTimeInStack = 60 * time.Second
+	defaultMinSize             = 64
+	maxSecondsInStack          = 60
+	minSecondsBetweenEvictions = 1
 )
 
 type item struct {
 	x  interface{}
-	ts time.Time
+	ts int64
 }
 
 type Stack struct {
 	sync.Mutex
-	vec []item
+	vec          []item
+	nextEviction int64
 }
 
 func (s *Stack) Put(x interface{}) {
-	now := time.Now()
+	now := time.Now().Unix()
 	s.Lock()
 	s.vec = append(s.vec, item{
 		x:  x,
@@ -31,10 +33,11 @@ func (s *Stack) Put(x interface{}) {
 		s.Unlock()
 		return
 	}
-	if s.vec[0].ts.Add(maxTimeInStack).Before(now) {
-		// Take out the oldest element
+	if s.nextEviction < now && s.vec[0].ts+maxSecondsInStack < now {
+		// Evict the oldest element
 		s.vec[0].x = nil
 		s.vec = s.vec[1:]
+		s.nextEviction = now + minSecondsBetweenEvictions
 		if len(s.vec) > defaultMinSize {
 			s.shrink()
 		}
