@@ -2,9 +2,12 @@ package shortlivedpool
 
 type noCopy struct{}
 
+// Pool is a drop-in replacement for sync.Pool
+// Its difference is that evicts older elements
+// so memory can be freed
 type Pool struct {
 	noCopy noCopy
-	stack  Stack
+	stack  EvictionStack
 	New    func() interface{}
 }
 

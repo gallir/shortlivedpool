@@ -8,7 +8,7 @@ import (
 const (
 	defaultMinSize             = 64
 	maxSecondsInStack          = 60
-	minSecondsBetweenEvictions = 1
+	minSecondsBetweenEvictions = 15
 )
 
 type item struct {
@@ -16,36 +16,44 @@ type item struct {
 	ts int64
 }
 
-type Stack struct {
+// EvictionStack remove elements that are older
+// than maxSecondsInStack seconds in the stack
+type EvictionStack struct {
 	sync.Mutex
 	vec          []item
-	nextEviction int64
+	nextEviction int64 // To avoid checking for evictions for every put
 }
 
-func (s *Stack) Put(x interface{}) {
+// Put pushes en element into the stack
+func (s *EvictionStack) Put(x interface{}) {
 	now := time.Now().Unix()
 	s.Lock()
 	s.vec = append(s.vec, item{
 		x:  x,
 		ts: now,
 	})
-	if len(s.vec) == 1 {
+
+	if len(s.vec) == 1 || s.nextEviction > now {
 		s.Unlock()
 		return
 	}
-	if s.nextEviction < now && s.vec[0].ts+maxSecondsInStack < now {
-		// Evict the oldest element
+
+	// Evict the oldest elements
+	for s.vec[0].ts+maxSecondsInStack < now {
 		s.vec[0].x = nil
 		s.vec = s.vec[1:]
-		s.nextEviction = now + minSecondsBetweenEvictions
-		if len(s.vec) > defaultMinSize {
-			s.shrink()
-		}
 	}
+
+	if len(s.vec) > defaultMinSize {
+		s.shrink()
+	}
+
+	s.nextEviction = now + minSecondsBetweenEvictions
 	s.Unlock()
 }
 
-func (s *Stack) Pop() interface{} {
+// Pop gets the last element inserted
+func (s *EvictionStack) Pop() interface{} {
 	s.Lock()
 	l := len(s.vec)
 	if l == 0 {
@@ -59,7 +67,7 @@ func (s *Stack) Pop() interface{} {
 	return x
 }
 
-func (s *Stack) shrink() {
+func (s *EvictionStack) shrink() {
 	if cap(s.vec) > len(s.vec)*4 {
 		newVec := make([]item, len(s.vec), len(s.vec)*2)
 		copy(newVec, s.vec)
