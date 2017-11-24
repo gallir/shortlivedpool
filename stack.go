@@ -40,11 +40,12 @@ func (s *Stack) Put(x interface{}) {
 }
 
 func (s *Stack) Pop() interface{} {
+	s.Lock()
 	l := len(s.vec)
 	if l == 0 {
+		s.Unlock()
 		return nil
 	}
-	s.Lock()
 	x := s.vec[l-1].x
 	s.vec = s.vec[:l-1]
 	s.Unlock()
