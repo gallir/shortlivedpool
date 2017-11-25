@@ -2,53 +2,30 @@ package shortlivedpool
 
 import (
 	"sync"
-	"time"
 )
 
 const (
-	defaultMinSize             = 64
-	maxSecondsInStack          = 60
-	minSecondsBetweenEvictions = 15
+	defaultMinSize = 64
 )
-
-type item struct {
-	x  interface{}
-	ts int64
-}
 
 // EvictionStack remove elements that are older
 // than maxSecondsInStack seconds in the stack
 type EvictionStack struct {
 	sync.Mutex
-	vec          []item
-	nextEviction int64 // To avoid checking for evictions for every put
+	vec []interface{}
 }
 
 // Put pushes en element into the stack
 func (s *EvictionStack) Put(x interface{}) {
-	now := time.Now().Unix()
 	s.Lock()
-	s.vec = append(s.vec, item{
-		x:  x,
-		ts: now,
-	})
+	s.vec = append(s.vec, x)
 
-	if len(s.vec) == 1 || s.nextEviction > now {
-		s.Unlock()
-		return
+	if len(s.vec) > defaultMinSize && cap(s.vec) > len(s.vec)*4 {
+		// Shrink the slice
+		newVec := make([]interface{}, len(s.vec), len(s.vec)*2)
+		copy(newVec, s.vec)
+		s.vec = newVec
 	}
-
-	// Evict the oldest elements
-	for s.vec[0].ts+maxSecondsInStack < now {
-		s.vec[0].x = nil
-		s.vec = s.vec[1:]
-	}
-
-	if len(s.vec) > defaultMinSize {
-		s.shrink()
-	}
-
-	s.nextEviction = now + minSecondsBetweenEvictions
 	s.Unlock()
 }
 
@@ -60,17 +37,9 @@ func (s *EvictionStack) Pop() interface{} {
 		s.Unlock()
 		return nil
 	}
-	x := s.vec[l-1].x
-	s.vec[l-1].x = nil
+	x := s.vec[l-1]
+	s.vec[l-1] = nil
 	s.vec = s.vec[:l-1]
 	s.Unlock()
 	return x
-}
-
-func (s *EvictionStack) shrink() {
-	if cap(s.vec) > len(s.vec)*4 {
-		newVec := make([]item, len(s.vec), len(s.vec)*2)
-		copy(newVec, s.vec)
-		s.vec = newVec
-	}
 }
