@@ -1,12 +1,16 @@
 package shortlivedpool
 
-import "time"
-import "sync/atomic"
+import (
+	"sync/atomic"
+	"time"
+)
 
 type noCopy struct{}
 
 const (
-	maxIdleGet = 60
+	maxNoEmpty              = 30
+	minPeriodBetweenDiscard = 2
+	minStackSize            = 1
 )
 
 // Pool is a drop-in replacement for sync.Pool
@@ -14,7 +18,7 @@ const (
 // so memory can be freed
 type Pool struct {
 	noCopy  noCopy
-	stack   EvictionStack
+	stack   SlicedStack
 	lastGet int64
 	New     func() interface{}
 }
@@ -22,10 +26,11 @@ type Pool struct {
 // Put adds x to the pool.
 func (p *Pool) Put(x interface{}) {
 	l := atomic.LoadInt64(&p.lastGet)
-	if l > 0 && l+maxIdleGet < time.Now().Unix() {
+	if l > 0 && p.stack.Len() > minStackSize && l+maxNoEmpty < time.Now().Unix() {
+		atomic.StoreInt64(&p.lastGet, l+minPeriodBetweenDiscard)
 		return
 	}
-	p.stack.Put(x)
+	p.stack.Push(x)
 }
 
 // Get selects the most recent used item from the Pool,
@@ -38,11 +43,13 @@ func (p *Pool) Put(x interface{}) {
 // the result of calling p.New.
 func (p *Pool) Get() (x interface{}) {
 	x = p.stack.Pop()
+
 	if x != nil {
 		return
 	}
 
 	atomic.StoreInt64(&p.lastGet, time.Now().Unix())
+
 	if p.New != nil {
 		return p.New()
 	}

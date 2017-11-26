@@ -8,15 +8,14 @@ const (
 	defaultMinSize = 64
 )
 
-// EvictionStack remove elements that are older
-// than maxSecondsInStack seconds in the stack
-type EvictionStack struct {
+// SlicedStack implements a simple stack on a slice
+type SlicedStack struct {
 	sync.Mutex
 	vec []interface{}
 }
 
 // Put pushes en element into the stack
-func (s *EvictionStack) Put(x interface{}) {
+func (s *SlicedStack) Push(x interface{}) {
 	s.Lock()
 	s.vec = append(s.vec, x)
 
@@ -30,7 +29,7 @@ func (s *EvictionStack) Put(x interface{}) {
 }
 
 // Pop gets the last element inserted
-func (s *EvictionStack) Pop() interface{} {
+func (s *SlicedStack) Pop() interface{} {
 	s.Lock()
 	l := len(s.vec)
 	if l == 0 {
@@ -42,4 +41,9 @@ func (s *EvictionStack) Pop() interface{} {
 	s.vec = s.vec[:l-1]
 	s.Unlock()
 	return x
+}
+
+// Len returns the number of elements in the array
+func (s *SlicedStack) Len() int {
+	return len(s.vec)
 }

@@ -2,6 +2,7 @@ package shortlivedpool
 
 import (
 	"fmt"
+	"math/rand"
 	"sync"
 	"testing"
 	"time"
@@ -57,15 +58,26 @@ func Test_Benchmark(t *testing.T) {
 	}
 
 	tests := []pooler{p1, p2}
+
+	ss := []string{}
 	t.Log("Running benchmarks")
 	for i, p := range tests {
 		start := time.Now()
-		for i := 0; i < 1000; i++ {
-			p.Put(fmt.Sprintf("N %d", i))
-		}
+
 		for i := 0; i < 10000000; i++ {
 			s := p.Get().(string)
+			if rand.Uint32()%10 == 0 {
+				for i := 0; i < 10; i++ {
+					ss = append(ss, p.Get().(string))
+				}
+			}
 			p.Put(s)
+			if rand.Uint32()%10 == 0 {
+				for i := 0; i < len(ss); i++ {
+					p.Put(ss[i])
+					ss = ss[:0]
+				}
+			}
 		}
 		fmt.Println("time", i, time.Since(start))
 	}
