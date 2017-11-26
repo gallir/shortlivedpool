@@ -18,7 +18,7 @@ const (
 // so memory can be freed
 type Pool struct {
 	noCopy  noCopy
-	stack   SlicedStack
+	stack   LFStack
 	lastGet int64
 	New     func() interface{}
 }
