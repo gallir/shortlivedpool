@@ -1,11 +1,8 @@
 package shortlivedpool
 
 import (
-	"fmt"
-	"math/rand"
 	"sync"
 	"testing"
-	"time"
 )
 
 var (
@@ -44,41 +41,48 @@ type pooler interface {
 	Get() interface{}
 }
 
-func Test_Benchmark(t *testing.T) {
-	p1 := &sync.Pool{
-		New: func() interface{} {
-			return aString
-		},
-	}
+func simple(b *testing.B, p pooler) {
+	b.RunParallel(func(pb *testing.PB) {
+		for pb.Next() {
+			p.Put(1)
+			p.Get()
+		}
+	})
+}
 
-	p2 := &Pool{
-		New: func() interface{} {
-			return aString
-		},
-	}
-
-	tests := []pooler{p1, p2}
-
-	ss := []string{}
-	t.Log("Running benchmarks")
-	for i, p := range tests {
-		start := time.Now()
-
-		for i := 0; i < 10000000; i++ {
-			s := p.Get().(string)
-			if rand.Uint32()%10 == 0 {
-				for i := 0; i < 10; i++ {
-					ss = append(ss, p.Get().(string))
-				}
+func overflow(b *testing.B, p pooler) {
+	b.RunParallel(func(pb *testing.PB) {
+		for pb.Next() {
+			for b := 0; b < 100; b++ {
+				p.Put(1)
 			}
-			p.Put(s)
-			if rand.Uint32()%10 == 0 {
-				for i := 0; i < len(ss); i++ {
-					p.Put(ss[i])
-					ss = ss[:0]
-				}
+			for b := 0; b < 100; b++ {
+				p.Get()
 			}
 		}
-		fmt.Println("time", i, time.Since(start))
-	}
+	})
+}
+
+func BenchmarkSyncPoolSimple(b *testing.B) {
+	p := &sync.Pool{}
+
+	simple(b, p)
+}
+
+func BenchmarkShortLivedPoolSimple(b *testing.B) {
+	p := &Pool{}
+
+	simple(b, p)
+}
+
+func BenchmarkSyncPoolOverflow(b *testing.B) {
+	p := &sync.Pool{}
+
+	overflow(b, p)
+}
+
+func BenchmarkShortLivedPoolOverflow(b *testing.B) {
+	p := &Pool{}
+
+	overflow(b, p)
 }
